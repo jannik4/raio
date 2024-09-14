@@ -94,7 +94,7 @@ async fn write_file(file: &str, block_size: u64, count: u64, verbose: bool) -> R
         let file = Rc::clone(&file);
         handles.push(monoio::spawn(async move {
             let pos = i * block_size;
-            file.write_all_at(block, pos).await.0
+            file.write_at(block, pos).await.0
         }));
     }
     for handle in handles {
