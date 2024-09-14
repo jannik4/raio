@@ -98,7 +98,8 @@ async fn write_file(file: &str, block_size: u64, count: u64, verbose: bool) -> R
         }));
     }
     for handle in handles {
-        handle.await?;
+        let written = handle.await?;
+        assert_eq!(written as u64, block_size);
     }
     let elapsed = start.elapsed().as_secs_f64();
 
