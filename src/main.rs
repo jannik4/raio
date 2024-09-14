@@ -87,8 +87,9 @@ async fn write_file(file: &str, block_size: u64, count: u64, verbose: bool) -> R
 
     let block = vec![0u8; block_size as usize];
     let start = Instant::now();
-    for _ in 0..count {
-        file.write_all_at(block.clone(), 0).await.0?;
+    for i in 0..count {
+        let pos = i * block_size;
+        file.write_all_at(block.clone(), pos).await.0?;
     }
     let elapsed = start.elapsed().as_secs_f64();
 
