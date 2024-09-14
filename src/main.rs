@@ -88,13 +88,17 @@ async fn write_file(file: &str, block_size: u64, count: u64, verbose: bool) -> R
     let file = Rc::new(file);
 
     let block = &*Vec::leak(vec![0u8; block_size as usize]);
+    let mut handles = Vec::with_capacity(count as usize);
     let start = Instant::now();
     for i in 0..count {
         let file = Rc::clone(&file);
-        monoio::spawn(async move {
+        handles.push(monoio::spawn(async move {
             let pos = i * block_size;
-            file.write_all_at(block, pos).await.0.unwrap();
-        });
+            file.write_all_at(block, pos).await.0
+        }));
+    }
+    for handle in handles {
+        handle.await?;
     }
     let elapsed = start.elapsed().as_secs_f64();
 
