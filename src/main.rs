@@ -272,61 +272,59 @@ async fn write_file(
         Strategy::IOUring4 => {
             drop(file);
 
-            if count > 0 {
-                let mut ring = IoUring::new(8)?;
+            let mut ring = IoUring::new(8)?;
 
-                let file = fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(path)?;
-                let fd = types::Fd(file.as_raw_fd());
+            let file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)?;
+            let fd = types::Fd(file.as_raw_fd());
 
-                let mut write = |ring: &mut IoUring, buf: *mut u8| {
-                    let write_e = opcode::Write::new(fd, buf, block_size as _)
-                        .build()
-                        .user_data(0x42);
+            let mut write = |ring: &mut IoUring, buf: *mut u8| {
+                let write_e = opcode::Write::new(fd, buf, block_size as _)
+                    .build()
+                    .user_data(0x42);
 
-                    // Note that the developer needs to ensure
-                    // that the entry pushed into submission queue is valid (e.g. fd, buffer).
-                    unsafe {
-                        ring.submission()
-                            .push(&write_e)
-                            .expect("submission queue is full");
-                    }
-
-                    Ok(())
-                };
-                let wait = |ring: &mut IoUring, want: usize| {
-                    ring.submit_and_wait(want)?;
-
-                    for _ in 0..want {
-                        let cqe = ring.completion().next().expect("completion queue is empty");
-                        assert_eq!(cqe.user_data(), 0x42);
-                        assert!(cqe.result() >= 0, "read error: {}", cqe.result());
-                    }
-
-                    Ok(())
-                };
-
-                let mut queue = VecDeque::with_capacity(4);
-                for i in 0..3 {
-                    let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
-                    write(&mut ring, buf)?;
-                    queue.push_back(buf);
+                // Note that the developer needs to ensure
+                // that the entry pushed into submission queue is valid (e.g. fd, buffer).
+                unsafe {
+                    ring.submission()
+                        .push(&write_e)
+                        .expect("submission queue is full");
                 }
-                for i in 3..count {
-                    let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
-                    write(&mut ring, buf)?;
-                    queue.push_back(buf);
 
-                    wait(&mut ring, 1)?;
-                    mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+                Ok(())
+            };
+            let wait = |ring: &mut IoUring, want: usize| {
+                ring.submit_and_wait(want)?;
+
+                for _ in 0..want {
+                    let cqe = ring.completion().next().expect("completion queue is empty");
+                    assert_eq!(cqe.user_data(), 0x42);
+                    assert!(cqe.result() >= 0, "read error: {}", cqe.result());
                 }
-                while let Some(buf) = queue.pop_front() {
-                    wait(&mut ring, 1)?;
-                    mem_aligned_free(buf, block_size as usize, 4096);
-                }
+
+                Ok(())
+            };
+
+            let mut queue = VecDeque::with_capacity(4);
+            for i in 0..u64::min(3, count) {
+                let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                write(&mut ring, buf)?;
+                queue.push_back(buf);
+            }
+            for i in 3..count {
+                let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                write(&mut ring, buf)?;
+                queue.push_back(buf);
+
+                wait(&mut ring, 1)?;
+                mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+            }
+            while let Some(buf) = queue.pop_front() {
+                wait(&mut ring, 1)?;
+                mem_aligned_free(buf, block_size as usize, 4096);
             }
         }
     }
