@@ -300,7 +300,7 @@ async fn write_file(
             let wait = |ring: &mut IoUring, want: usize| {
                 let ready = dbg!(ring.submit_and_wait(want)?);
 
-                for _ in 0..want {
+                for _ in 0..ready {
                     let cqe = ring.completion().next().expect("completion queue is empty");
                     println!("write result: {} @ {}", cqe.result(), cqe.user_data());
                     // if cqe.result() < 0 {
@@ -310,7 +310,7 @@ async fn write_file(
                     // assert!(cqe.result() >= 0, "write error: {}", cqe.result());
                 }
 
-                Ok(())
+                Ok(ready)
             };
 
             let mut queue = VecDeque::with_capacity(8);
@@ -324,12 +324,14 @@ async fn write_file(
                 write(&mut ring, i, buf)?;
                 queue.push_back(buf);
 
-                wait(&mut ring, 1)?;
-                mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+                for _ in 0..wait(&mut ring, 1)? {
+                    mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+                }
             }
-            while let Some(buf) = queue.pop_front() {
-                wait(&mut ring, 1)?;
-                mem_aligned_free(buf, block_size as usize, 4096);
+            while !queue.is_empty() {
+                for _ in 0..wait(&mut ring, 1)? {
+                    mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+                }
             }
         }
     }
