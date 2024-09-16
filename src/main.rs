@@ -1,6 +1,7 @@
 #![allow(unused)] // Remove this line to enable warnings.
 
 use anyhow::{Context, Ok, Result};
+use humansize::{ISizeFormatter, SizeFormatter, BINARY};
 use monoio::fs::{File, OpenOptions};
 use std::{
     default,
@@ -123,13 +124,14 @@ async fn write_file(
     let file = Rc::new(file);
 
     // let block = &*Vec::leak(vec![0u8; block_size as usize]);
+    let mut written = 0;
     let start = Instant::now();
     match strategy {
         Strategy::Sequential => {
             for i in 0..count {
                 let pos = i * block_size;
                 let block = make_block(block_size, i * block_size / 64);
-                file.write_at(block, /*pos*/ 0).await.0?;
+                written += file.write_at(block, /*pos*/ 0).await.0?;
             }
         }
         Strategy::Async => {
@@ -143,8 +145,7 @@ async fn write_file(
                 }));
             }
             for handle in handles {
-                let written = handle.await?;
-                // assert_eq!(written as u64, block_size);
+                written += handle.await?;
             }
         }
         Strategy::Async2 => {
@@ -163,10 +164,10 @@ async fn write_file(
                         let block = make_block(block_size, i * block_size / 64);
                         file.write_at(block, /*pos*/ 0).await.0
                     });
-                    current.await?;
+                    written += current.await?;
                     current = next;
                 }
-                current.await?;
+                written += current.await?;
             }
         }
     }
@@ -175,10 +176,11 @@ async fn write_file(
 
     let speed = (block_size * count) as f64 / elapsed;
     println!(
-        "write {} bytes in {:.6} seconds, speed: {:.3} bytes/s",
+        "writen {}/{} bytes in {:.6} seconds @ {}/s",
+        written,
         block_size * count,
         elapsed,
-        speed
+        ISizeFormatter::new(speed, BINARY),
     );
 
     Ok(())
