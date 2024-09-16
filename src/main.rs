@@ -232,6 +232,7 @@ async fn write_file(
                 let mut write = |ring: &mut IoUring, buf: *mut u8| {
                     let write_e = opcode::Write::new(fd, buf, block_size as _)
                         .build()
+                        .flags(Flags::IO_DRAIN)
                         .user_data(0x42);
 
                     // Note that the developer needs to ensure
@@ -299,10 +300,8 @@ async fn write_file(
             };
             let wait = |ring: &mut IoUring, want: usize| {
                 ring.submit_and_wait(want)?;
-                // let ready = dbg!(ring.submit_and_wait(want)?);
-                let ready = 1;
 
-                for _ in 0..ready {
+                for _ in 0..want {
                     let cqe = ring.completion().next().expect("completion queue is empty");
                     // println!("write result: {} @ {}", cqe.result(), cqe.user_data());
                     if cqe.result() < 0 {
@@ -312,7 +311,7 @@ async fn write_file(
                     // assert!(cqe.result() >= 0, "write error: {}", cqe.result());
                 }
 
-                Ok(ready)
+                Ok(want)
             };
 
             let mut queue = VecDeque::with_capacity(8);
