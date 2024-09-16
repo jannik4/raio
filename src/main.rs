@@ -302,9 +302,10 @@ async fn write_file(
 
                 for _ in 0..want {
                     let cqe = ring.completion().next().expect("completion queue is empty");
-                    if cqe.result() < 0 {
-                        println!("write error: {} @ {}", cqe.result(), cqe.user_data());
-                    }
+                    println!("write result: {} @ {}", cqe.result(), cqe.user_data());
+                    // if cqe.result() < 0 {
+                    //     println!("write error: {} @ {}", cqe.result(), cqe.user_data());
+                    // }
                     // assert_eq!(cqe.user_data(), 0x42);
                     // assert!(cqe.result() >= 0, "write error: {}", cqe.result());
                 }
