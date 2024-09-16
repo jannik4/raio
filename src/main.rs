@@ -211,8 +211,7 @@ async fn write_file(
                 let cqe = ring.completion().next().expect("completion queue is empty");
 
                 assert_eq!(cqe.user_data(), 0x42);
-                assert!(cqe.result() >= 0, "read error: {}", cqe.result());
-                dbg!(cqe.result());
+                assert!(cqe.result() >= 0, "write error: {}", cqe.result());
 
                 mem_aligned_free(buf, block_size as usize, 4096);
             }
@@ -251,7 +250,7 @@ async fn write_file(
                     let cqe = ring.completion().next().expect("completion queue is empty");
 
                     assert_eq!(cqe.user_data(), 0x42);
-                    assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+                    assert!(cqe.result() >= 0, "write error: {}", cqe.result());
 
                     Ok(())
                 };
@@ -303,11 +302,11 @@ async fn write_file(
 
                 for _ in 0..want {
                     let cqe = ring.completion().next().expect("completion queue is empty");
-                    if cqe.result() >= 0 {
-                        println!("read error: {} @ {}", cqe.result(), cqe.user_data());
+                    if cqe.result() < 0 {
+                        println!("write error: {} @ {}", cqe.result(), cqe.user_data());
                     }
                     // assert_eq!(cqe.user_data(), 0x42);
-                    // assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+                    // assert!(cqe.result() >= 0, "write error: {}", cqe.result());
                 }
 
                 Ok(())
