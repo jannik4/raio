@@ -5,6 +5,7 @@ use humansize::{ISizeFormatter, SizeFormatter, BINARY};
 use io_uring::{opcode, types, IoUring};
 use monoio::fs::{File, OpenOptions};
 use std::{
+    collections::VecDeque,
     default, fs,
     io::{Read, Write},
     os::unix::io::AsRawFd,
@@ -50,6 +51,8 @@ enum Strategy {
     Async,
     Async2,
     IOUring,
+    IOUring2,
+    IOUring4,
 }
 
 impl FromStr for Strategy {
@@ -61,6 +64,8 @@ impl FromStr for Strategy {
             "async" => Ok(Self::Async),
             "async2" => Ok(Self::Async2),
             "io_uring" => Ok(Self::IOUring),
+            "io_uring2" => Ok(Self::IOUring2),
+            "io_uring3" => Ok(Self::IOUring4),
             _ => Err(anyhow::anyhow!("Invalid strategy")),
         }
     }
@@ -177,6 +182,43 @@ async fn write_file(
         Strategy::IOUring => {
             drop(file);
 
+            let mut ring = IoUring::new(8)?;
+
+            let file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)?;
+            let fd = types::Fd(file.as_raw_fd());
+
+            for i in 0..count {
+                // let mut buf = make_block(block_size, i * block_size / 64);
+                let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                let write_e = opcode::Write::new(fd, buf, block_size as _)
+                    .build()
+                    .user_data(0x42);
+
+                // Note that the developer needs to ensure
+                // that the entry pushed into submission queue is valid (e.g. fd, buffer).
+                unsafe {
+                    ring.submission()
+                        .push(&write_e)
+                        .expect("submission queue is full");
+                }
+
+                ring.submit_and_wait(1)?;
+
+                let cqe = ring.completion().next().expect("completion queue is empty");
+
+                assert_eq!(cqe.user_data(), 0x42);
+                assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+
+                mem_aligned_free(buf, block_size as usize, 4096);
+            }
+        }
+        Strategy::IOUring2 => {
+            drop(file);
+
             if count > 0 {
                 let mut ring = IoUring::new(8)?;
 
@@ -225,31 +267,66 @@ async fn write_file(
                 }
                 wait(&mut ring)?;
                 mem_aligned_free(current, block_size as usize, 4096);
+            }
+        }
+        Strategy::IOUring4 => {
+            drop(file);
 
-                // for i in 0..count {
-                //     // let mut buf = make_block(block_size, i * block_size / 64);
-                //     let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
-                //     let write_e = opcode::Write::new(fd, buf, block_size as _)
-                //         .build()
-                //         .user_data(0x42);
-                //
-                //     // Note that the developer needs to ensure
-                //     // that the entry pushed into submission queue is valid (e.g. fd, buffer).
-                //     unsafe {
-                //         ring.submission()
-                //             .push(&write_e)
-                //             .expect("submission queue is full");
-                //     }
-                //
-                //     ring.submit_and_wait(1)?;
-                //
-                //     let cqe = ring.completion().next().expect("completion queue is empty");
-                //
-                //     assert_eq!(cqe.user_data(), 0x42);
-                //     assert!(cqe.result() >= 0, "read error: {}", cqe.result());
-                //
-                //     mem_aligned_free(buf, block_size as usize, 4096);
-                // }
+            if count > 0 {
+                let mut ring = IoUring::new(8)?;
+
+                let file = fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(path)?;
+                let fd = types::Fd(file.as_raw_fd());
+
+                let mut write = |ring: &mut IoUring, buf: *mut u8| {
+                    let write_e = opcode::Write::new(fd, buf, block_size as _)
+                        .build()
+                        .user_data(0x42);
+
+                    // Note that the developer needs to ensure
+                    // that the entry pushed into submission queue is valid (e.g. fd, buffer).
+                    unsafe {
+                        ring.submission()
+                            .push(&write_e)
+                            .expect("submission queue is full");
+                    }
+
+                    Ok(())
+                };
+                let wait = |ring: &mut IoUring, want: usize| {
+                    ring.submit_and_wait(want)?;
+
+                    for _ in 0..want {
+                        let cqe = ring.completion().next().expect("completion queue is empty");
+                        assert_eq!(cqe.user_data(), 0x42);
+                        assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+                    }
+
+                    Ok(())
+                };
+
+                let mut queue = VecDeque::with_capacity(4);
+                for i in 0..3 {
+                    let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                    write(&mut ring, buf)?;
+                    queue.push_back(buf);
+                }
+                for i in 4..count {
+                    let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                    write(&mut ring, buf)?;
+                    queue.push_back(buf);
+
+                    wait(&mut ring, 1)?;
+                    mem_aligned_free(queue.pop_front().unwrap(), block_size as usize, 4096);
+                }
+                while let Some(buf) = queue.pop_front() {
+                    wait(&mut ring, 1)?;
+                    mem_aligned_free(buf, block_size as usize, 4096);
+                }
             }
         }
     }
