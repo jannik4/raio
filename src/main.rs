@@ -185,26 +185,28 @@ async fn write_file(
                 .truncate(true)
                 .open(path)?;
             let fd = types::Fd(file.as_raw_fd());
-            let mut buf = make_block(block_size, 0);
 
-            let write_e = opcode::Write::new(fd, buf.as_mut_ptr(), buf.len() as _)
-                .build()
-                .user_data(0x42);
+            for i in 0..count {
+                let mut buf = make_block(block_size, i * block_size / 64);
+                let write_e = opcode::Write::new(fd, buf.as_mut_ptr(), buf.len() as _)
+                    .build()
+                    .user_data(0x42);
 
-            // Note that the developer needs to ensure
-            // that the entry pushed into submission queue is valid (e.g. fd, buffer).
-            unsafe {
-                ring.submission()
-                    .push(&write_e)
-                    .expect("submission queue is full");
+                // Note that the developer needs to ensure
+                // that the entry pushed into submission queue is valid (e.g. fd, buffer).
+                unsafe {
+                    ring.submission()
+                        .push(&write_e)
+                        .expect("submission queue is full");
+                }
+
+                ring.submit_and_wait(1)?;
+
+                let cqe = ring.completion().next().expect("completion queue is empty");
+
+                assert_eq!(cqe.user_data(), 0x42);
+                assert!(cqe.result() >= 0, "read error: {}", cqe.result());
             }
-
-            ring.submit_and_wait(1)?;
-
-            let cqe = ring.completion().next().expect("completion queue is empty");
-
-            assert_eq!(cqe.user_data(), 0x42);
-            assert!(cqe.result() >= 0, "read error: {}", cqe.result());
         }
     }
 
