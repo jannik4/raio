@@ -220,9 +220,11 @@ async fn write_file(
                     let next = make_block_mem_aligned(block_size, i * block_size / 64)?;
                     write(&mut ring, next)?;
                     wait(&mut ring)?;
+                    mem_aligned_free(current, block_size as usize, 4096);
                     current = next;
                 }
                 wait(&mut ring)?;
+                mem_aligned_free(current, block_size as usize, 4096);
 
                 // for i in 0..count {
                 //     // let mut buf = make_block(block_size, i * block_size / 64);
