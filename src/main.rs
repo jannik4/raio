@@ -272,7 +272,7 @@ async fn write_file(
         Strategy::IOUring8 => {
             drop(file);
 
-            let mut ring = IoUring::new(8)?;
+            let mut ring = IoUring::new(32)?;
 
             let file = fs::OpenOptions::new()
                 .write(true)
