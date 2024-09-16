@@ -281,11 +281,11 @@ async fn write_file(
                 .open(path)?;
             let fd = types::Fd(file.as_raw_fd());
 
-            let mut write = |ring: &mut IoUring, buf: *mut u8| {
+            let mut write = |ring: &mut IoUring, i: u64, buf: *mut u8| {
                 let write_e = opcode::Write::new(fd, buf, block_size as _)
                     .build()
                     .flags(Flags::IO_LINK)
-                    .user_data(0x42);
+                    .user_data(i);
 
                 // Note that the developer needs to ensure
                 // that the entry pushed into submission queue is valid (e.g. fd, buffer).
@@ -302,7 +302,10 @@ async fn write_file(
 
                 for _ in 0..want {
                     let cqe = ring.completion().next().expect("completion queue is empty");
-                    assert_eq!(cqe.user_data(), 0x42);
+                    if cqe.result() >= 0 {
+                        println!("read error: {} @ {}", cqe.result(), cqe.user_data());
+                    }
+                    // assert_eq!(cqe.user_data(), 0x42);
                     // assert!(cqe.result() >= 0, "read error: {}", cqe.result());
                 }
 
@@ -312,12 +315,12 @@ async fn write_file(
             let mut queue = VecDeque::with_capacity(8);
             for i in 0..u64::min(7, count) {
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
-                write(&mut ring, buf)?;
+                write(&mut ring, i, buf)?;
                 queue.push_back(buf);
             }
             for i in 7..count {
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
-                write(&mut ring, buf)?;
+                write(&mut ring, i, buf)?;
                 queue.push_back(buf);
 
                 wait(&mut ring, 1)?;
