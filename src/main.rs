@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Ok, Result};
 use humansize::{ISizeFormatter, SizeFormatter, BINARY};
-use io_uring::{opcode, types, IoUring};
+use io_uring::{opcode, squeue::Flags, types, IoUring};
 use monoio::fs::{File, OpenOptions};
 use std::{
     collections::VecDeque,
@@ -284,6 +284,7 @@ async fn write_file(
             let mut write = |ring: &mut IoUring, buf: *mut u8| {
                 let write_e = opcode::Write::new(fd, buf, block_size as _)
                     .build()
+                    .flags(Flags::IO_LINK)
                     .user_data(0x42);
 
                 // Note that the developer needs to ensure
