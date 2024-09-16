@@ -315,7 +315,7 @@ async fn write_file(
                     write(&mut ring, buf)?;
                     queue.push_back(buf);
                 }
-                for i in 4..count {
+                for i in 3..count {
                     let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
                     write(&mut ring, buf)?;
                     queue.push_back(buf);
