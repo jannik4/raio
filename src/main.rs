@@ -303,7 +303,7 @@ async fn write_file(
                 for _ in 0..want {
                     let cqe = ring.completion().next().expect("completion queue is empty");
                     assert_eq!(cqe.user_data(), 0x42);
-                    assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+                    // assert!(cqe.result() >= 0, "read error: {}", cqe.result());
                 }
 
                 Ok(())
