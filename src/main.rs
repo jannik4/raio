@@ -129,7 +129,7 @@ async fn write_file(
             for i in 0..count {
                 let pos = i * block_size;
                 let block = make_block(block_size, i * block_size / 64);
-                file.write_at(block, pos).await.0?;
+                file.write_all_at(block, pos).await.0?;
             }
         }
         Strategy::Async => {
@@ -139,7 +139,7 @@ async fn write_file(
                 handles.push(monoio::spawn(async move {
                     let pos = i * block_size;
                     let block = make_block(block_size, i * block_size / 64);
-                    file.write_at(block, pos).await.0
+                    file.write_all_at(block, pos).await.0
                 }));
             }
             for handle in handles {
@@ -153,7 +153,7 @@ async fn write_file(
                     let file = Rc::clone(&file);
                     async move {
                         let block = make_block(block_size, 0);
-                        file.write_at(block, 0).await.0
+                        file.write_all_at(block, 0).await.0
                     }
                 });
                 for i in 1..count {
@@ -161,7 +161,7 @@ async fn write_file(
                     let next = monoio::spawn(async move {
                         let pos = i * block_size;
                         let block = make_block(block_size, i * block_size / 64);
-                        file.write_at(block, pos).await.0
+                        file.write_all_at(block, pos).await.0
                     });
                     current.await?;
                     current = next;
