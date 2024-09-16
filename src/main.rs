@@ -232,7 +232,7 @@ async fn write_file(
                 let mut write = |ring: &mut IoUring, buf: *mut u8| {
                     let write_e = opcode::Write::new(fd, buf, block_size as _)
                         .build()
-                        .flags(Flags::IO_DRAIN)
+                        // .flags(Flags::IO_DRAIN)
                         .user_data(0x42);
 
                     // Note that the developer needs to ensure
@@ -285,7 +285,7 @@ async fn write_file(
             let mut write = |ring: &mut IoUring, i: u64, buf: *mut u8| {
                 let write_e = opcode::Write::new(fd, buf, block_size as _)
                     .build()
-                    .flags(Flags::IO_DRAIN)
+                    // .flags(Flags::IO_DRAIN)
                     .user_data(i);
 
                 // Note that the developer needs to ensure
