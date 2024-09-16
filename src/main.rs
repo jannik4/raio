@@ -187,8 +187,9 @@ async fn write_file(
             let fd = types::Fd(file.as_raw_fd());
 
             for i in 0..count {
-                let mut buf = make_block(block_size, i * block_size / 64);
-                let write_e = opcode::Write::new(fd, buf.as_mut_ptr(), buf.len() as _)
+                // let mut buf = make_block(block_size, i * block_size / 64);
+                let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                let write_e = opcode::Write::new(fd, buf, block_size as _)
                     .build()
                     .user_data(0x42);
 
@@ -206,6 +207,8 @@ async fn write_file(
 
                 assert_eq!(cqe.user_data(), 0x42);
                 assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+
+                mem_aligned_free(buf, block_size as usize, 4096);
             }
         }
     }
@@ -242,4 +245,30 @@ fn make_block(block_size: u64, idx: u64) -> Vec<u8> {
     }
 
     data
+}
+
+fn make_block_mem_aligned(block_size: u64, idx: u64) -> Result<*mut u8> {
+    let mut ptr = mem_aligned(block_size as usize, 4096)?;
+
+    let slice = unsafe { std::slice::from_raw_parts_mut(ptr, block_size as usize) };
+    for i in 0..block_size as usize / 64 {
+        slice[i * 64..i * 64 + 8].copy_from_slice(&u64::to_le_bytes(idx + i as u64));
+    }
+
+    Ok(ptr)
+}
+
+fn mem_aligned(size: usize, align: usize) -> Result<*mut u8> {
+    let layout = std::alloc::Layout::from_size_align(size, align).context("invalid layout")?;
+    let ptr = unsafe { std::alloc::alloc(layout) };
+    if ptr.is_null() {
+        Err(anyhow::anyhow!("failed to allocate memory"))
+    } else {
+        Ok(ptr)
+    }
+}
+
+fn mem_aligned_free(ptr: *mut u8, size: usize, align: usize) {
+    let layout = std::alloc::Layout::from_size_align(size, align).unwrap();
+    unsafe { std::alloc::dealloc(ptr, layout) }
 }
