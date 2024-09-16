@@ -217,7 +217,7 @@ async fn write_file(
                 write(&mut ring, current)?;
 
                 for i in 1..count {
-                    let next = make_block_mem_aligned(block_size, 0)?;
+                    let next = make_block_mem_aligned(block_size, i * block_size / 64)?;
                     write(&mut ring, next)?;
                     wait(&mut ring)?;
                     current = next;
