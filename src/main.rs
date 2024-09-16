@@ -131,7 +131,7 @@ async fn write_file(
             for i in 0..count {
                 let pos = i * block_size;
                 let block = make_block(block_size, i * block_size / 64);
-                written += file.write_at(block, /*pos*/ 0).await.0?;
+                file.write_all_at(block, /*pos*/ 0).await.0?;
             }
         }
         Strategy::Async => {
