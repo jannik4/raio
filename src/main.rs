@@ -52,7 +52,7 @@ enum Strategy {
     Async2,
     IOUring,
     IOUring2,
-    IOUring4,
+    IOUring8,
 }
 
 impl FromStr for Strategy {
@@ -65,7 +65,7 @@ impl FromStr for Strategy {
             "async2" => Ok(Self::Async2),
             "io_uring" => Ok(Self::IOUring),
             "io_uring2" => Ok(Self::IOUring2),
-            "io_uring3" => Ok(Self::IOUring4),
+            "io_uring8" => Ok(Self::IOUring8),
             _ => Err(anyhow::anyhow!("Invalid strategy")),
         }
     }
@@ -269,7 +269,7 @@ async fn write_file(
                 mem_aligned_free(current, block_size as usize, 4096);
             }
         }
-        Strategy::IOUring4 => {
+        Strategy::IOUring8 => {
             drop(file);
 
             let mut ring = IoUring::new(8)?;
@@ -309,13 +309,13 @@ async fn write_file(
                 Ok(())
             };
 
-            let mut queue = VecDeque::with_capacity(4);
-            for i in 0..u64::min(3, count) {
+            let mut queue = VecDeque::with_capacity(8);
+            for i in 0..u64::min(7, count) {
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
                 write(&mut ring, buf)?;
                 queue.push_back(buf);
             }
-            for i in 3..count {
+            for i in 7..count {
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
                 write(&mut ring, buf)?;
                 queue.push_back(buf);
