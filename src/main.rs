@@ -212,6 +212,7 @@ async fn write_file(
 
                 assert_eq!(cqe.user_data(), 0x42);
                 assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+                dbg!(cqe.result());
 
                 mem_aligned_free(buf, block_size as usize, 4096);
             }
