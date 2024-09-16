@@ -1,6 +1,6 @@
 #![allow(unused)] // Remove this line to enable warnings.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
 use monoio::fs::{File, OpenOptions};
 use std::{
     default,
@@ -45,6 +45,7 @@ enum Strategy {
     #[default]
     Sequential,
     Async,
+    Async2,
 }
 
 impl FromStr for Strategy {
@@ -54,6 +55,7 @@ impl FromStr for Strategy {
         match s {
             "seq" => Ok(Self::Sequential),
             "async" => Ok(Self::Async),
+            "async2" => Ok(Self::Async2),
             _ => Err(anyhow::anyhow!("Invalid strategy")),
         }
     }
@@ -143,6 +145,28 @@ async fn write_file(
             for handle in handles {
                 let written = handle.await?;
                 // assert_eq!(written as u64, block_size);
+            }
+        }
+        Strategy::Async2 => {
+            if count > 0 {
+                let mut current = monoio::spawn({
+                    let file = Rc::clone(&file);
+                    async move {
+                        let block = make_block(block_size, 0);
+                        file.write_at(block, 0).await.0
+                    }
+                });
+                for i in 1..count {
+                    let file = Rc::clone(&file);
+                    let next = monoio::spawn(async move {
+                        let pos = i * block_size;
+                        let block = make_block(block_size, i * block_size / 64);
+                        file.write_at(block, pos).await.0
+                    });
+                    current.await?;
+                    current = next;
+                }
+                current.await?;
             }
         }
     }
