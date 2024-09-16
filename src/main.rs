@@ -298,15 +298,16 @@ async fn write_file(
                 Ok(())
             };
             let wait = |ring: &mut IoUring, want: usize| {
-                let ready = dbg!(ring.submit_and_wait(want)?);
+                ring.submit_and_wait(want)?;
+                // let ready = dbg!(ring.submit_and_wait(want)?);
                 let ready = 1;
 
                 for _ in 0..ready {
                     let cqe = ring.completion().next().expect("completion queue is empty");
-                    println!("write result: {} @ {}", cqe.result(), cqe.user_data());
-                    // if cqe.result() < 0 {
-                    //     println!("write error: {} @ {}", cqe.result(), cqe.user_data());
-                    // }
+                    // println!("write result: {} @ {}", cqe.result(), cqe.user_data());
+                    if cqe.result() < 0 {
+                        println!("write error: {} @ {}", cqe.result(), cqe.user_data());
+                    }
                     // assert_eq!(cqe.user_data(), 0x42);
                     // assert!(cqe.result() >= 0, "write error: {}", cqe.result());
                 }
