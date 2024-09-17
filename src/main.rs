@@ -185,7 +185,7 @@ async fn write_file(
             let mut ring = IoUring::new(8)?;
 
             let file = fs::OpenOptions::new()
-                .write(true)
+                .append(true)
                 // .create(true)
                 // .truncate(true)
                 .open(path)?;
