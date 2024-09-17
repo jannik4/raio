@@ -8,7 +8,7 @@ use std::{
     collections::VecDeque,
     default, fs,
     io::{Read, Write},
-    os::unix::io::AsRawFd,
+    os::unix::{fs::FileExt, io::AsRawFd},
     rc::Rc,
     str::FromStr,
     time::{Duration, Instant},
@@ -143,7 +143,7 @@ async fn write_file(
                 let pos = i * block_size;
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
                 let slice = unsafe { std::slice::from_raw_parts_mut(buf, block_size as usize) };
-                file.write_all(slice)?;
+                file.write_all_at(slice, 0)?;
                 mem_aligned_free(buf, block_size as usize, 4096);
             }
         }
