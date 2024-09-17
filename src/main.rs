@@ -148,8 +148,10 @@ async fn write_file(
 
             for i in 0..count {
                 let pos = i * block_size;
-                let block = make_block(block_size, i * block_size / 64);
-                file.write_all(&block)?;
+                let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
+                let slice = unsafe { std::slice::from_raw_parts_mut(buf, block_size as usize) };
+                file.write_all(slice)?;
+                mem_aligned_free(buf, block_size as usize, 4096);
             }
         }
         Strategy::Sequential => {
