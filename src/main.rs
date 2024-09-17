@@ -150,7 +150,7 @@ async fn write_file(
                 let pos = i * block_size;
                 let buf = make_block_mem_aligned(block_size, i * block_size / 64)?;
                 let slice = unsafe { std::slice::from_raw_parts_mut(buf, block_size as usize) };
-                let _ = file.write(slice)?;
+                file.write_all(slice)?;
                 mem_aligned_free(buf, block_size as usize, 4096);
             }
         }
