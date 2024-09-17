@@ -127,19 +127,11 @@ async fn write_file(
     strategy: Strategy,
     verbose: bool,
 ) -> Result<()> {
-    let file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(path)
-        .await?;
-    let file = Rc::new(file);
-
     // let block = &*Vec::leak(vec![0u8; block_size as usize]);
     let mut written = 0;
     let start = Instant::now();
     match strategy {
         Strategy::Std => {
-            drop(file);
             let mut file = fs::OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -156,6 +148,13 @@ async fn write_file(
             }
         }
         Strategy::Sequential => {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(path)
+                .await?;
+            let file = Rc::new(file);
+
             for i in 0..count {
                 let pos = i * block_size;
                 let block = make_block(block_size, i * block_size / 64);
@@ -163,6 +162,13 @@ async fn write_file(
             }
         }
         Strategy::Async => {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(path)
+                .await?;
+            let file = Rc::new(file);
+
             let mut handles = Vec::with_capacity(count as usize);
             for i in 0..count {
                 let file = Rc::clone(&file);
@@ -177,6 +183,13 @@ async fn write_file(
             }
         }
         Strategy::Async2 => {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(path)
+                .await?;
+            let file = Rc::new(file);
+
             if count > 0 {
                 let mut current = monoio::spawn({
                     let file = Rc::clone(&file);
@@ -199,8 +212,6 @@ async fn write_file(
             }
         }
         Strategy::IOUring => {
-            drop(file);
-
             let mut ring = IoUring::new(8)?;
 
             let file = fs::OpenOptions::new()
@@ -236,8 +247,6 @@ async fn write_file(
             }
         }
         Strategy::IOUring2 => {
-            drop(file);
-
             if count > 0 {
                 let mut ring = IoUring::new(8)?;
 
@@ -290,8 +299,6 @@ async fn write_file(
             }
         }
         Strategy::IOUring8 => {
-            drop(file);
-
             let mut ring = IoUring::new(32)?;
 
             let file = fs::OpenOptions::new()
