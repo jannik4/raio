@@ -141,7 +141,8 @@ async fn write_file(
         Strategy::Std => {
             drop(file);
             let mut file = fs::OpenOptions::new()
-                .append(true)
+                .read(true)
+                .write(true)
                 // .create(true)
                 // .truncate(true)
                 .open(path)?;
