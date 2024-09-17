@@ -186,8 +186,8 @@ async fn write_file(
 
             let file = fs::OpenOptions::new()
                 .write(true)
-                .create(true)
-                .truncate(true)
+                // .create(true)
+                // .truncate(true)
                 .open(path)?;
             let fd = types::Fd(file.as_raw_fd());
 
