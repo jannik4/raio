@@ -223,9 +223,9 @@ async fn write_file(
                 let mut ring = IoUring::new(8)?;
 
                 let file = fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
+                    .append(true)
+                    // .create(true)
+                    // .truncate(true)
                     .open(path)?;
                 let fd = types::Fd(file.as_raw_fd());
 
@@ -276,9 +276,9 @@ async fn write_file(
             let mut ring = IoUring::new(32)?;
 
             let file = fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
+                .append(true)
+                // .create(true)
+                // .truncate(true)
                 .open(path)?;
             let fd = types::Fd(file.as_raw_fd());
 
