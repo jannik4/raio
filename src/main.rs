@@ -47,6 +47,7 @@ enum SubCmd {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum Strategy {
     #[default]
+    Std,
     Sequential,
     Async,
     Async2,
@@ -60,6 +61,7 @@ impl FromStr for Strategy {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "std" => Ok(Self::Std),
             "seq" => Ok(Self::Sequential),
             "async" => Ok(Self::Async),
             "async2" => Ok(Self::Async2),
@@ -136,6 +138,20 @@ async fn write_file(
     let mut written = 0;
     let start = Instant::now();
     match strategy {
+        Strategy::Std => {
+            drop(file);
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                // .create(true)
+                // .truncate(true)
+                .open(path)?;
+
+            for i in 0..count {
+                let pos = i * block_size;
+                let block = make_block(block_size, i * block_size / 64);
+                file.write_all(&block)?;
+            }
+        }
         Strategy::Sequential => {
             for i in 0..count {
                 let pos = i * block_size;
